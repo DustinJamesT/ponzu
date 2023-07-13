@@ -65,12 +65,13 @@ def getProtocol_api(protocol):
 
   return data
 
-
+@retry(ValueError, tries=3, delay=3)
 async def getProtocol_async_api(session, sem , protocol):
   url = f'https://api.llama.fi/protocol/{protocol}'
   async with sem:
     async with session.get(url) as resp:
       data = await resp.json()
+      
 
   data = {'protocol': protocol, 'data': data}
 

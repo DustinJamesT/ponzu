@@ -29,7 +29,7 @@ from ._actions import (generateOutline_,
                        generateKeyEventOutline_)
 
 
-class Writer(GPT): 
+class Researcher(GPT): 
     
   def __init__(self) -> None:
       super().__init__()
