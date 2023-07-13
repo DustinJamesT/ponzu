@@ -65,12 +65,13 @@ def getProtocol_api(protocol):
 
   return data
 
-@retry(ValueError, tries=3, delay=3)
+@retry(ValueError, tries=5, delay=3)
 async def getProtocol_async_api(session, sem , protocol):
   url = f'https://api.llama.fi/protocol/{protocol}'
   async with sem:
     async with session.get(url) as resp:
       data = await resp.json()
+  
 
   if type(data) != dict:
     raise ValueError('Protocol Async API did not return dict.')
@@ -78,13 +79,11 @@ async def getProtocol_async_api(session, sem , protocol):
   if 'chainTvls' not in data.keys():
     raise ValueError('Protocol Async API did not return correct values.')
     
-      
-
   data = {'protocol': protocol, 'data': data}
 
   return data
 
-async def getProtocolsData_(protocols): 
+async def getProtocolsData_(protocols, sleep = 0.1): 
   sem = asyncio.Semaphore(8)
 
   async with aiohttp.ClientSession() as session:
@@ -94,6 +93,8 @@ async def getProtocolsData_(protocols):
       data.append(
         asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
       )
+
+      await asyncio.sleep(sleep)
     
     protocol_data = await asyncio.gather(*data)
 
