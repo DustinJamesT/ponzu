@@ -71,6 +71,13 @@ async def getProtocol_async_api(session, sem , protocol):
   async with sem:
     async with session.get(url) as resp:
       data = await resp.json()
+
+  if type(data) != dict:
+    raise ValueError('Protocol Async API did not return dict.')
+  
+  if 'chainTvls' not in data.keys():
+    raise ValueError('Protocol Async API did not return correct values.')
+    
       
 
   data = {'protocol': protocol, 'data': data}
