@@ -144,7 +144,26 @@ class Artemis:
         print('Warning -- No valid metrics provided, using default metrics') if self.verbose else None
         self.metrics_bam = self.default_metrics_bam
 
+  def _getValidApps(self):
+    app_df = getAppSummaryTable()
 
+    # -- filter for valid chains
+    app_df = app_df[app_df['chainValue'].isin(self.chains_bam)]
+
+    # -- filter for valid categories
+    app_df = app_df[app_df['parentValue'].isin(self.categories)]
+
+    valid_apps = list(app_df['value'].unique())
+
+    return valid_apps
+  
+  def _buildAppUrl(self, apps):
+    url_apps = str(apps).replace('[', '').replace(']', '').replace(' ', '').replace("'", "")
+
+    # -- create filter 
+    self.url_apps = '&applications=' + url_apps
+
+    return self.url_apps
 
   def _setAppDefaults(self, app_limit = 25):
     app_df = getAppSummaryTable()
@@ -156,6 +175,9 @@ class Artemis:
     app_df = app_df[app_df['parentValue'].isin(self.categories)]
 
     valid_apps = list(app_df['value'].unique())
+
+    # -- get valid apps
+    valid_apps = self._getValidApps()
 
     if len(self.apps) == 0:
       valid_apps = valid_apps[:app_limit]
@@ -229,7 +251,7 @@ class Artemis:
 
     return df
   
-  def getChainActivityByApp(self, chains = [], categories = [], metrics = [], apps = [], start_date = '', days = 180, app_limit = 25, exclude_category = False): 
+  def getChainActivityByApp_(self, chains = [], categories = [], metrics = [], apps = [], start_date = '', days = 180, app_limit = 25, exclude_category = False): 
     # -- Returns df of chain metrics with columns: ['date', 'chain', 'metric', 'category', 'application', 'value']
     # ---- > Logic: 1) Set api params in object state. 2) edit params in state to be defaults if not provided. 3) call api. 4) process data. 5) return df
 
@@ -251,6 +273,46 @@ class Artemis:
 
     # -- get data from artemis
     df = getChainActivityByApp_(self.chains_bam, self.metrics_bam, self.start_date, self.url_categories, self.url_apps, self.sleep)
+    self.apps_df = df
+
+    return df
+  
+  def getChainActivityByApp(self, chains = [], categories = [], metrics = [], apps = [], start_date = '', days = 180, app_limit = 25, exclude_category = False): 
+    # -- Returns df of chain metrics with columns: ['date', 'chain', 'metric', 'category', 'application', 'value']
+    # ---- > Logic: 1) Set api params in object state. 2) edit params in state to be defaults if not provided. 3) call api. 4) process data. 5) return df
+
+    # -- set api params defaults if not provided
+    self.chains_bam = chains
+    self.categories = categories
+    self.metrics_bam = metrics
+    self.apps = apps
+
+    self.start_date = start_date
+    self.days = days
+
+    # -- set defaults if not provided
+    self._setChainDefaults_BAM()
+    self._setCategoryDefaults_BAM() if exclude_category == False else None
+    self._setMetricDefaults_BAM()
+    self._setDateDefaults()
+    
+    # -- get valid apps
+    valid_apps = self._getValidApps()
+
+    # -- break up into chunks of 100
+    chunks = [valid_apps[x:x+100] for x in range(0, len(valid_apps), 100)]
+
+    # -- get app df for each chunk
+    dfs = []
+
+    for chunk in chunks:
+      url_apps = self._buildAppUrl(chunk)
+      df = getChainActivityByApp_(self.chains_bam, self.metrics_bam, self.start_date, self.url_categories, url_apps, self.sleep)
+
+      dfs.append(df)
+
+    # -- concat into one df
+    df = pd.concat(dfs)
     self.apps_df = df
 
     return df
