@@ -73,8 +73,12 @@ async def getProtocol_async_api(session, sem ,protocol):
       try:
         data = await resp.json()
       except:
-        await asyncio.sleep(5)
-        data = await resp.json()
+        await asyncio.sleep(3)
+        try:
+          data = await resp.json()
+        except:
+          await asyncio.sleep(15)
+          data = await resp.json()
   
   if type(data) != dict:
     raise ValueError('Protocol Async API did not return dict.')
