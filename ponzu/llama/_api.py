@@ -89,10 +89,11 @@ async def getProtocol_async_api(session, sem, protocol):
   url = f'https://api.llama.fi/protocol/{protocol}'
   async with sem:
     async with session.get(url) as resp:
-      if resp.status == 200:
-        data = await resp.json()
-      else:
-        data = await getProtocol_async_api_ratelimt(session, sem, protocol)
+      data = await resp.json()
+      #if resp.status == 200:
+        #data = await resp.json()
+      #else:
+        #data = await getProtocol_async_api_ratelimt(session, sem, protocol)
          
   if type(data) != dict:
     raise ValueError('Protocol Async API did not return dict.')
@@ -134,7 +135,7 @@ async def getProtocolsData_(protocols, sleep = 0.1):
       # -- used to have a try, except here but trying to avoid that
       data.append(asyncio.ensure_future(getProtocol_async_api(session, sem, protocol)))
 
-      await asyncio.sleep(0.126)
+      #await asyncio.sleep(0.126)
     
     protocol_data = await asyncio.gather(*data)
 

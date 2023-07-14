@@ -4,6 +4,7 @@
 # -- standard imports 
 import pandas as pd
 import asyncio
+import time
 
 # -- local imports
 from ._api import getProtocols_api, getProtocolsData_, getChains_api, getYieldPools_api, getPoolsHistoricalYields_api, getFundamentalsByProtocol_api
@@ -83,7 +84,19 @@ class Llama:
 
     # -- get unprocessed tvl data
     protocols = protocols_df['slug'].unique()
-    protocol_data = run_async(getProtocolsData_, protocols) 
+
+    # -- break into chunks of 500 protocols to avoid api rate limit
+    protocol_chunks = [protocols[i:i + 500] for i in range(0, len(protocols), 500)]
+    
+    # -- get protocol data
+    protocol_data = []
+    for chunk in protocol_chunks:
+      protocol_data_ = run_async(getProtocolsData_, chunk) 
+      protocol_data.append(protocol_data_)
+      time.sleep(65)
+
+    # -- old code for getting protocol data
+    #protocol_data = run_async(getProtocolsData_, protocols) 
       
     # -- process data into dataframe
     df = processProtocolData_(protocol_data, chains, self.protocols_)
