@@ -111,28 +111,28 @@ async def getProtocolsData_(protocols, sleep = 0.1):
     data = []
     for protocol in protocols:
       # -- new code 
-      try:
-        protocol_data = asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
+      #try:
+        #protocol_data = asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
       
-        if type(protocol_data['data']) == dict:
-          if 'chainTvls' in protocol_data['data'].keys():
-            data.append(protocol_data)
+        #if type(protocol_data['data']) == dict:
+          #if 'chainTvls' in protocol_data['data'].keys():
+            #data.append(protocol_data)
 
-      except:
+      #except:
 
-        await asyncio.sleep(10)
+        #await asyncio.sleep(10)
 
-        protocol_data = asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
+        #protocol_data = asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
       
-        if type(protocol_data['data']) == dict:
-          if 'chainTvls' in protocol_data['data'].keys():
-            data.append(asyncio.ensure_future(protocol_data))
+        #if type(protocol_data['data']) == dict:
+          #if 'chainTvls' in protocol_data['data'].keys():
+            #data.append(asyncio.ensure_future(protocol_data))
           
       
         
 
       # -- used to have a try, except here but trying to avoid that
-      #data.append(asyncio.ensure_future(getProtocol_async_api(session, sem, protocol)))
+      data.append(asyncio.ensure_future(getProtocol_async_api(session, sem, protocol)))
 
       await asyncio.sleep(0.126)
     
