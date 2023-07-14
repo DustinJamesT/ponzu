@@ -65,21 +65,35 @@ def getProtocol_api(protocol):
 
   return data
 
+async def getProtocol_async_api_ratelimt(session, sem, protocol):
+  calls = 0 
+  call_limit  = 10
+
+  for i in range(call_limit):
+    calls += 1
+    try:
+      data = await getProtocol_async_api(session, sem, protocol)
+      if 'data' in data.keys():
+        data = data['data']
+        break
+    except:
+      await asyncio.sleep(3)
+  
+  if calls == call_limit:
+    raise ValueError('Protocol Async API did not return dict.')
+  
+  return data
+
 #@retry(ValueError, tries=5, delay=3)
-async def getProtocol_async_api(session, sem ,protocol):
+async def getProtocol_async_api(session, sem, protocol):
   url = f'https://api.llama.fi/protocol/{protocol}'
   async with sem:
     async with session.get(url) as resp:
-      try:
+      if resp.status == 200:
         data = await resp.json()
-      except:
-        await asyncio.sleep(3)
-        try:
-          data = await resp.json()
-        except:
-          await asyncio.sleep(15)
-          data = await resp.json()
-  
+      else:
+        data = await getProtocol_async_api_ratelimt(session, sem, protocol)
+         
   if type(data) != dict:
     raise ValueError('Protocol Async API did not return dict.')
   
@@ -98,21 +112,21 @@ async def getProtocolsData_(protocols, sleep = 0.1):
     for protocol in protocols:
       # -- new code 
       try:
-        protocol_data = await getProtocol_async_api(session, sem, protocol)
+        protocol_data = asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
       
         if type(protocol_data['data']) == dict:
           if 'chainTvls' in protocol_data['data'].keys():
             data.append(protocol_data)
-            
+
       except:
 
         await asyncio.sleep(10)
 
-        protocol_data = await getProtocol_async_api(session, sem, protocol)
+        protocol_data = asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
       
         if type(protocol_data['data']) == dict:
           if 'chainTvls' in protocol_data['data'].keys():
-            data.append(protocol_data)
+            data.append(asyncio.ensure_future(protocol_data))
           
       
         
@@ -120,7 +134,7 @@ async def getProtocolsData_(protocols, sleep = 0.1):
       # -- used to have a try, except here but trying to avoid that
       #data.append(asyncio.ensure_future(getProtocol_async_api(session, sem, protocol)))
 
-      await asyncio.sleep(sleep)
+      await asyncio.sleep(0.126)
     
     protocol_data = await asyncio.gather(*data)
 
