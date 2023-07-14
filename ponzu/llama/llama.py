@@ -86,14 +86,14 @@ class Llama:
     protocols = protocols_df['slug'].unique()
 
     # -- break into chunks of 500 protocols to avoid api rate limit
-    protocol_chunks = [protocols[i:i + 500] for i in range(0, len(protocols), 500)]
+    protocol_chunks = [protocols[i:i + 450] for i in range(0, len(protocols), 450)]
     
     # -- get protocol data
     protocol_data = []
     for chunk in protocol_chunks:
       protocol_data_ = run_async(getProtocolsData_, chunk) 
       protocol_data.append(protocol_data_)
-      time.sleep(65)
+      time.sleep(60)
 
     # -- old code for getting protocol data
     #protocol_data = run_async(getProtocolsData_, protocols) 

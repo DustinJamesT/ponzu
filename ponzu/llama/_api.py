@@ -89,7 +89,11 @@ async def getProtocol_async_api(session, sem, protocol):
   url = f'https://api.llama.fi/protocol/{protocol}'
   async with sem:
     async with session.get(url) as resp:
-      data = await resp.json()
+      try:
+        data = await resp.json()
+      except:
+        print(f'Error: {protocol} - {resp.status} - {resp.text}')
+
       #if resp.status == 200:
         #data = await resp.json()
       #else:
