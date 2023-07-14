@@ -66,13 +66,13 @@ def getProtocol_api(protocol):
   return data
 
 @retry(ValueError, tries=5, delay=3)
-async def getProtocol_async_api(session, sem , protocol):
+async def getProtocol_async_api(session, sem ,protocol):
   url = f'https://api.llama.fi/protocol/{protocol}'
   async with sem:
     async with session.get(url) as resp:
       data = await resp.json()
+      await asyncio.sleep(0.128)
   
-
   if type(data) != dict:
     raise ValueError('Protocol Async API did not return dict.')
   

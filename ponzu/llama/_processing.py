@@ -57,9 +57,6 @@ def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes 
   # -- initialize data store 
   data_ = []
 
-  # -- remove none values
-  protocol_data = [protocol for protocol in protocol_data if protocol is not None]
-
   for protocol_ in protocol_data:
     protocol = protocol_['protocol']
     data = protocol_['data']
