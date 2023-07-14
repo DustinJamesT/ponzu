@@ -96,10 +96,29 @@ async def getProtocolsData_(protocols, sleep = 0.1):
   async with aiohttp.ClientSession() as session:
     data = []
     for protocol in protocols:
+      # -- new code 
+      try:
+        protocol_data = await getProtocol_async_api(session, sem, protocol)
+      
+        if type(protocol_data['data']) == dict:
+          if 'chainTvls' in protocol_data['data'].keys():
+            data.append(protocol_data)
+            
+      except:
+
+        await asyncio.sleep(10)
+
+        protocol_data = await getProtocol_async_api(session, sem, protocol)
+      
+        if type(protocol_data['data']) == dict:
+          if 'chainTvls' in protocol_data['data'].keys():
+            data.append(protocol_data)
+          
+      
+        
+
       # -- used to have a try, except here but trying to avoid that
-      data.append(
-        asyncio.ensure_future(getProtocol_async_api(session, sem, protocol))
-      )
+      #data.append(asyncio.ensure_future(getProtocol_async_api(session, sem, protocol)))
 
       await asyncio.sleep(sleep)
     
