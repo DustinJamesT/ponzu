@@ -212,7 +212,13 @@ async def getStablecoinHistory_api(session, sem, stable_id):
 
   async with sem:
     async with session.get(url) as resp:
-      data = await resp.json()
+      try:
+        data = await resp.json()
+      except:
+        print(f'Error: {stable_id} - {resp.status} - {resp.text}')
+        data = {'chainBalances':{}}
+
+      #data = await resp.json()
 
   data_ = {'stable_id': stable_id, 'data': data}
 

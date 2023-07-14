@@ -61,8 +61,12 @@ def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes 
     protocol = protocol_['protocol']
     data = protocol_['data']
 
-    # -- unpack tvl sub types to exclude (e.g. total borrowed. we want chain specific borrowed for example)
-    exlcuded_subtypes = getExcludedTVLsubtypes(data)
+    # -- remove sub tvl types
+    if 'currentChainTvls' in data.keys():
+      exlcuded_subtypes = getExcludedTVLsubtypes(data) # unpack tvl sub types to exclude (e.g. total borrowed. we want chain specific borrowed for example)
+    else:
+      exlcuded_subtypes = []
+      print(f'Warning: {protocol} does not have currentChainTvls')
 
     # -- get category if not already set
     if 'category' not in data.keys() and 'otherProtocols' in data.keys():
