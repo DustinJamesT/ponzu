@@ -93,6 +93,7 @@ async def getProtocol_async_api(session, sem, protocol):
         data = await resp.json()
       except:
         print(f'Error: {protocol} - {resp.status} - {resp.text}')
+        data = {'chainTvls':{}}
 
       #if resp.status == 200:
         #data = await resp.json()
