@@ -92,7 +92,7 @@ class Llama:
     protocol_data = []
     for chunk in protocol_chunks:
       protocol_data_ = run_async(getProtocolsData_, chunk) 
-      protocol_data.append(protocol_data_)
+      protocol_data.extend(protocol_data_)
       time.sleep(60)
 
     # -- old code for getting protocol data
