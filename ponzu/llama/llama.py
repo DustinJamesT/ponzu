@@ -217,7 +217,7 @@ class Llama:
     pool_ids = list(pools_df.pool.unique())
 
     # -- chunk into 500/min pools to avoid api rate limit
-    pool_chunks = [pool_ids[i:i + 250] for i in range(0, len(pool_ids), 250)]
+    pool_chunks = [pool_ids[i:i + 175] for i in range(0, len(pool_ids), 175)]
 
     print('Number of pools: ', len(pool_ids))
     print('Number of chunks: ', len(pool_chunks))
