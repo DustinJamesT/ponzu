@@ -135,6 +135,24 @@ def unpackProtocols(date_, protocols_, chain, metric):
   return unpacked
 
 # ==================================================
+# -- Yield Helpers
+# ==================================================
+
+
+def getBadPoolIds(pools_list):
+  bad_ids = []
+
+  for pool_data_ in pools_list:
+    if type(pool_data_) == dict:
+      if 'data' in pool_data_.keys(): 
+        if pool_data_['data'] is None:
+          bad_ids.append(pool_data_['pool_id'])
+    else:
+      bad_ids.append(pool_data_)
+
+  return bad_ids
+
+# ==================================================
 # -- Stablecoin Helpers
 # ==================================================
 

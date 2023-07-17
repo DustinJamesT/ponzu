@@ -307,15 +307,18 @@ def getYieldPools_api():
 
   return data
 
-@retry(ValueError, tries=3, delay=5)
+#@retry(ValueError, tries=3, delay=5)
 async def getYieldHistorical_async(session, sem, pool_id): 
   url = f'https://yields.llama.fi/chart/{pool_id}'
 
   async with sem:
-    #await asyncio.sleep(1)  # -- TODO set the semaphore to the amount of requests per second and always sleep 1 second
-    #print(f" sdsdsd {len(asyncio.all_tasks())}")}")
     async with session.get(url) as resp:
-      data = await resp.json()
+      try:  
+        data = await resp.json()
+      except:
+        print(f'Error: {pool_id} - {resp.status} - {resp.text}')
+        data = {'pool_id': pool_id, 'data': None}
+
 
   data = {'pool_id': pool_id, 'data': data}
 
@@ -332,9 +335,10 @@ async def getPoolsHistoricalYields_api(pool_ids, sleep = 0.128):
     data = []
     for pool_id in pool_ids:
       data.append(asyncio.ensure_future(getYieldHistorical_async(session, sem, pool_id)))
-      time.sleep(sleep)
+      #time.sleep(sleep)
     
     pool_data = await asyncio.gather(*data, return_exceptions=True)
+    #pool_data = await asyncio.gather(*data)
 
   if type(pool_data) != list:
     raise ValueError('Pools API did not return list.')

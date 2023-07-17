@@ -237,13 +237,38 @@ def filterYieldPools_(pools_df_, tvl_cutoff = 1000000, chains = [], tokens = [],
 
   return pools_df
 
+def removePoolDataErrors(pools_list): 
+  for pool_data_ in pools_list:
+    if type(pool_data_) != dict:
+      print(type(pool_data_))
+      print(pool_data_)
+      pools_list.remove(pool_data_)
+  
+  return pools_list
+
+def getBadPoolIds(pools_list):
+  bad_ids = []
+
+  for pool_data_ in pools_list:
+    if type(pool_data_) != dict:
+      bad_ids.append(pool_data_)
+
+    elif 'data' in pool_data_.keys(): 
+      if pool_data_['data'] is None:
+        bad_ids.append(pool_data_['pool_id'])
+
+  return bad_ids
 
 def processPoolData_(pools_list, pools_df): 
   # -- initialize data store
   dfs = []
 
+  # -- clean data
+  pools_list = removePoolDataErrors(pools_list)
+
   # -- loop through pools
   for pool_data_ in pools_list:
+
     pool_id = pool_data_['pool_id']
     pool_data = pool_data_['data']
 

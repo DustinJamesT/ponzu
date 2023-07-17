@@ -15,6 +15,7 @@ from ._processing import filterYieldPools_, processPoolData_, getYieldsDataframe
 from ._processing import buildStablecoinPriceDict_, processStablesList_, processStablesHistory, processStablesChartHistory
 
 from ._helpers import remapCategories, run_async
+from ._helpers import getBadPoolIds
 from ._helpers import filterValidStables, removeBadStables, buildStableHistoryAPIinputs
 
 # -- TODO: Pull API out of processing 
@@ -200,36 +201,70 @@ class Llama:
   # -- Yields
   # ==================================================
 
-  def getHistoricalYields(self, chains = [], tokens = [], protocols = [], tvl_cutoff = 1000000):
+  def getHistoricalYields(self, chains = [], tokens = [], protocols = [], tvl_cutoff = 1000000, save_state = False):
 
     # -- set defaults if not provided (will take a long time to run. intentially allowed to run without parameters)
     chains = chains if len(chains) > 0 else self.default_chains
 
     # -- get master pool df 
     yields_data = getYieldPools_api() 
-    self.yields_pools = getYieldsDataframe(yields_data) 
+    yield_df = getYieldsDataframe(yields_data) 
 
     # -- filter master pools 
-    pools_df = filterYieldPools_(self.yields_pools, tvl_cutoff = tvl_cutoff, chains = chains, tokens = tokens, protocols = protocols)
+    pools_df = filterYieldPools_(yield_df, tvl_cutoff = tvl_cutoff, chains = chains, tokens = tokens, protocols = protocols)
 
     # -- get historical data for each pool
     pool_ids = list(pools_df.pool.unique())
-    yields_data = run_async(getPoolsHistoricalYields_api, pool_ids) 
+
+    # -- chunk into 500/min pools to avoid api rate limit
+    pool_chunks = [pool_ids[i:i + 250] for i in range(0, len(pool_ids), 250)]
+
+    print('Number of pools: ', len(pool_ids))
+    print('Number of chunks: ', len(pool_chunks))
+
+    dfs = []
+    bad_ids = []
+
+    for i, chunk in enumerate(pool_chunks):
+      print('Chunk: ', i)
+      yields_data = run_async(getPoolsHistoricalYields_api, chunk) 
+      bad_ids.extend(getBadPoolIds(yields_data))
+      yields_df = processPoolData_(yields_data, pools_df)
+      dfs.append(yields_df)
+
+      if len(pool_chunks) > 1:
+        print('Sleeping...')
+        time.sleep(60)
+
+    # -- retry bad pools 
+    if len(bad_ids) > 0:
+      time.sleep(30)
+      yields_data = run_async(getPoolsHistoricalYields_api, bad_ids) 
+      yields_df = processPoolData_(yields_data, pools_df)
+      dfs.append(yields_df)
+
+    print(len(bad_ids))
+    print(bad_ids)
+
+    yields_df = pd.concat(dfs) 
+
+    #yields_data = run_async(getPoolsHistoricalYields_api, pool_ids) 
 
     # -- process data and combine into single df
-    yields_df = processPoolData_(yields_data, pools_df)
+    #yields_df = processPoolData_(yields_data, pools_df)
 
     # -- set object state
-    self.yields = yields_df.copy()
+    if save_state:
+      self.yields = yields_df.copy()
 
     return yields_df
   
   def getCurrentYieldPools(self): 
     # -- get master pool df 
     yields_data = getYieldPools_api() 
-    self.yields_pools = getYieldsDataframe(yields_data) 
+    yield_df = getYieldsDataframe(yields_data) 
 
-    return self.yields_pools
+    return yield_df
 
 
   # ==================================================
