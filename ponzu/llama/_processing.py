@@ -349,3 +349,27 @@ def processStablesHistory(stables, data, price_dict):
 
   return df 
 
+def processStablesChartHistory(stables, data, price_dict):
+  data_store = []
+
+  for stable in stables:
+    for stable_data in data: 
+      for daily_data in stable_data['data']:
+        if stable_data['stable_id'] == stable['stable_id']: 
+
+          data_store.append({
+            'date': daily_data['date'],
+            'symbol': stable['symbol'],
+            'chain': stable_data['chain'],
+            'supply': daily_data['totalCirculating']['peggedUSD'],
+            'supplyUSD': daily_data['totalCirculatingUSD']['peggedUSD'], 
+            })
+
+
+  df = pd.DataFrame(data_store)
+
+  # -- convert date to datetime
+  df['date'] = pd.to_datetime(df['date'], unit='s')
+
+  return df 
+

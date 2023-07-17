@@ -13,7 +13,7 @@ from retry import retry
 #sem = asyncio.Semaphore(8)
 
 # -- local imports
-from ._helpers import getMetricTypeDefaults
+from ._helpers import getMetricTypeDefaults, buildStableHistoryAPIinputs
 
 # ==================================================
 # -- Protocols + Chains 
@@ -220,7 +220,7 @@ async def getStablecoinHistory_api(session, sem, stable_id):
 
       #data = await resp.json()
 
-  data_ = {'stable_id': stable_id, 'data': data}
+  data_ = {'stable_id': stable_id,'data': data}
 
   if type(data_['data']['chainBalances']) != dict:
     raise ValueError('Stablecoins API returned an error. Please check your inputs and try again.')
@@ -245,6 +245,50 @@ async def getStablecoinsHistory_(stables):
       raise ValueError('Stablecoin History API did not return list.')
 
   return stablecoin_data
+
+@retry(ValueError, tries=3, delay=5)
+async def getStablecoinChartHistory_api(session, sem, chain, stable_id):
+  url = f'https://stablecoins.llama.fi/stablecoincharts/{chain}?stablecoin={stable_id}'
+
+  async with sem:
+    async with session.get(url) as resp:
+      try:
+        data = await resp.json()
+      except:
+        print(f'Error: {stable_id} - {resp.status} - {resp.text}')
+        data = []
+
+      #data = await resp.json()
+
+  data_ = {'stable_id': stable_id, 'chain': chain, 'data': data}
+
+  if type(data_['data']) != list:
+    raise ValueError('Stablecoins Chart API returned an error. Please check your inputs and try again.')
+
+  return data_
+
+async def getStablecoinsChartHistory_(inputs = []): 
+
+  sem = asyncio.Semaphore(8)
+
+  async with aiohttp.ClientSession() as session:
+    data = []
+    for input_ in inputs:
+
+      data.append(
+        asyncio.ensure_future(getStablecoinChartHistory_api(session, sem, input_['chain'], input_['stable_id']))
+      )
+    
+    stablecoin_data = await asyncio.gather(*data)
+
+    if type(stablecoin_data) != list:
+      raise ValueError('Stablecoin Chart History API did not return list.')
+
+  return stablecoin_data
+
+
+
+
 
 
 # ==================================================

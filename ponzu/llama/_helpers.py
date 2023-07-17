@@ -198,6 +198,16 @@ def removeBadStables(stables):
       filtered_stables.append(stable)
 
   return filtered_stables
+
+def buildStableHistoryAPIinputs(stables, chains): 
+  inputs = []
+
+  for stable in stables: 
+    for chain in chains:
+      if chain in stable['chains']:
+        inputs.append({'chain': chain, 'stable_id': stable['id'], 'symbol': stable['symbol']})
+
+  return inputs
   
 
 # ==================================================

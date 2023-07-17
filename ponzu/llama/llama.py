@@ -8,14 +8,14 @@ import time
 
 # -- local imports
 from ._api import getProtocols_api, getProtocolsData_, getChains_api, getYieldPools_api, getPoolsHistoricalYields_api, getFundamentalsByProtocol_api
-from ._api import getStablecoinPrices_api, getStablesList_api, getStablecoinHistory_api, getStablecoinsHistory_
+from ._api import getStablecoinPrices_api, getStablesList_api, getStablecoinHistory_api, getStablecoinsHistory_, getStablecoinsChartHistory_
 
 from ._processing import filterProtocols_, processProtocolData_, processFundamentalsByProtocol_, getFundamentalsByChain_, getChainMetrics_, combineTVLandMetrics_, processFundamentalsByChain_
 from ._processing import filterYieldPools_, processPoolData_, getYieldsDataframe
-from ._processing import buildStablecoinPriceDict_, processStablesList_, processStablesHistory
+from ._processing import buildStablecoinPriceDict_, processStablesList_, processStablesHistory, processStablesChartHistory
 
 from ._helpers import remapCategories, run_async
-from ._helpers import filterValidStables, removeBadStables
+from ._helpers import filterValidStables, removeBadStables, buildStableHistoryAPIinputs
 
 # -- TODO: Pull API out of processing 
 
@@ -100,7 +100,7 @@ class Llama:
       
     # -- process data into dataframe
     df = processProtocolData_(protocol_data, chains, self.protocols_)
-    self.tvls = df
+    #self.tvls = df
     
     return df
   
@@ -252,6 +252,46 @@ class Llama:
     # -- get stablecoin history for each stablecoin object 
     stables_data = run_async(getStablecoinsHistory_, stable_objects) 
     stables_df = processStablesHistory(stable_objects, stables_data, price_dict)
+
+    # -- filter df by chains
+    if len(chains) > 0:
+      #chains = [chain.lower() for chain in chains]
+      stables_df = stables_df[stables_df['chain'].isin(chains)]
+    
+    return stables_df
+  
+  def stablecoinChartHistory(self, stables = [], chains = [], mcap_threshold = 0): 
+    # -- get a list valid of stablecoin objects 
+    valid_stables_data = getStablesList_api()
+    valid_stables = processStablesList_(valid_stables_data)
+
+    chains = chains if len(chains) > 0 else self.default_chains_stables
+
+    # -- filter valid stables for stables provided or use default stables
+    stable_objects = filterValidStables(valid_stables, chains, stables, mcap_threshold)
+    stable_objects = removeBadStables(stable_objects)
+
+    # -- retrieve historical stablecoin pricing data
+    price_data = getStablecoinPrices_api()
+    price_dict = buildStablecoinPriceDict_(price_data)
+
+
+    # -- build chain <> token inputs for api 
+    api_input = buildStableHistoryAPIinputs(stable_objects, chains)
+
+    # -- break into chunks of 500 protocols to avoid api rate limit
+    api_input_chunks = [api_input[i:i + 300] for i in range(0, len(api_input), 300)]
+
+    dfs = []
+
+    for chunk in api_input_chunks:
+      stables_data = run_async(getStablecoinsChartHistory_, chunk) 
+      stables_df = processStablesChartHistory(chunk, stables_data, price_dict)
+      dfs.append(stables_df)
+
+      time.sleep(60)
+
+    stables_df = pd.concat(dfs)
 
     # -- filter df by chains
     if len(chains) > 0:
