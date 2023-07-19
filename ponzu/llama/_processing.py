@@ -72,6 +72,11 @@ def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes 
     if 'category' not in data.keys() and 'otherProtocols' in data.keys():
       data['category'] = getSubprotocolCategory(data, protocols_df)
 
+    if 'parentProtocol' not in data.keys():
+      data['parentProtocol'] = protocol
+    else:
+      data['parentProtocol'] = data['parentProtocol'].split('#')[-1]
+
     for type_, tvl_data in data['chainTvls'].items():
       # -- parse type and chain 
       tvl_type, chain_ = parseTVLtype(type_)
@@ -83,6 +88,7 @@ def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes 
             'date': dailyData['date'],
             'chain': chain_,
             'protocol': protocol,
+            'parentProtocol': data['parentProtocol'],
             'category': data['category'],
             'type': tvl_type,
             'tvl': dailyData['totalLiquidityUSD']
@@ -131,12 +137,34 @@ def processFundamentalsByChain_(data, chain, metric = 'fees'):
   df['date'] = pd.to_datetime(df['date'])
 
   # -- unpack protocols
-  data = []
-  df.apply(lambda row: data.extend(unpackProtocols(row['date'], row[metric], chain, metric)), axis=1)
+  data_ = []
+  df.apply(lambda row: data_.extend(unpackProtocols(row['date'], row[metric], chain, metric)), axis=1)
 
-  df_ = pd.DataFrame(data)
+  df_ = pd.DataFrame(data_)
+
+  # -- add category column and parent column 
+  protocol_data = {}
+  for protocol in data['protocols']: 
+    key = protocol['displayName']
+    parent = protocol['parentProtocol'].split('#')[-1] if 'parentProtocol' in protocol.keys() else protocol['module']
+
+    protocol_data[key] = {'category': protocol['category'], 'parentProtocol': parent}
+
+    # -- ghetto clean bsc data 
+    if chain == 'bsc' and metric == 'volume':
+      key = protocol['module']
+      protocol_data[key] = {'category': protocol['category'], 'parentProtocol': parent}
+
+
+  df_['category'] = df_['protocol'].apply(lambda protocol: protocol_data[protocol]['category'] if protocol in protocol_data.keys() else 'unknown')
+  df_['parentProtocol'] = df_['protocol'].apply(lambda protocol: protocol_data[protocol]['parentProtocol'] if protocol in protocol_data.keys() else 'unknown')
+
+
+  # -- reorder columns
+  df_ = df_[['date', 'chain', 'protocol', 'parentProtocol', 'category', 'metric', 'value']]
 
   return df_
+
 
 def processFundamentalsByProtocol_(data, metric = 'fees'):
   # -- convert to df
@@ -192,7 +220,7 @@ def combineTVLandMetrics_(tvl_df, metrics_df, metrics):
     return tvl_df
   
   # -- rework tvl df to match metrics df columns
-  tvl_df = tvl_df.drop(columns = ['category'])
+  #tvl_df = tvl_df.drop(columns = ['category'])
   tvl_df = tvl_df.rename(columns = {'tvl': 'value'}) 
 
   # -- filter tvl types to only include metrics 

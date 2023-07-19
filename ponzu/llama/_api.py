@@ -149,7 +149,7 @@ async def getProtocolsData_(protocols, sleep = 0.1):
 # ==================================================
 # -- Fundamental Metrics
 # ==================================================
-
+@retry(ValueError, tries=5, delay=3)
 def getFundamentalsByChain_api(chain, metric = 'fees'):
   # -- get metric and metric type
   metric, metric_type = getMetricTypeDefaults(metric)
@@ -163,6 +163,7 @@ def getFundamentalsByChain_api(chain, metric = 'fees'):
 
   return data 
 
+@retry(ValueError, tries=5, delay=3)
 def getFundamentalsByProtocol_api(protocol, metric = 'fees'):
   # -- get metric and metric type
   metric, metric_type = getMetricTypeDefaults(metric)

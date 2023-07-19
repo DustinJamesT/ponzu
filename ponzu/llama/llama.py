@@ -113,15 +113,18 @@ class Llama:
     # -- confirm protocol is valid
     if chain.lower() not in self.chains_['name_lower'].unique():
       raise ValueError(f'{chain} is not a valid chain')
+  
+    if chain.lower() == 'binance':
+      chain = 'bsc'
     
     if metric not in self.default_metrics:
       raise ValueError(f'{metric} is not a valid metric')
     
     # -- get api data 
-    df = getFundamentalsByChain_(chain, metric)
+    data = getFundamentalsByChain_(chain, metric)
 
     # -- process data
-    df = processFundamentalsByChain_(df, chain, metric)
+    df = processFundamentalsByChain_(data, chain, metric)
 
     return df
   
@@ -185,15 +188,18 @@ class Llama:
     # -- get metric data
     metrics_ = [metric for metric in metrics if metric not in ['tvl', 'borrowed']]
     if len(metrics_) > 0:
-      metric_df = self.getChainMetrics_(chains = chains, metrics = metrics_, sleep = self.sleep)
+      #metric_df = getChainMetrics_(chains = chains, metrics = metrics_, sleep = self.sleep)
+      metric_df = self.getFundamentalsByChains(chains=chains, metrics=metrics_)
+      metric_df = metric_df.rename(columns={'metric': 'type'})
 
     # -- get tvl data
     if 'tvl' in metrics or 'borrowed' in metrics:
-      tvl_df = self.getChainTVL(chains = chains)
+      chains_ = [chain.lower() for chain in chains]
+      tvl_df = self.getChainTVL(chains = chains_)
 
     # -- merge dataframes
     df = combineTVLandMetrics_(tvl_df, metric_df, metrics)
-    self.fundementals = df
+    #self.fundementals = df
 
     return df
 
@@ -232,7 +238,7 @@ class Llama:
       yields_df = processPoolData_(yields_data, pools_df)
       dfs.append(yields_df)
 
-      if len(pool_chunks) > 1:
+      if len(pool_chunks) > 1 and i < len(pool_chunks) - 1:
         print('Sleeping...')
         time.sleep(60)
 
@@ -345,5 +351,19 @@ class Llama:
     df = pd.DataFrame(stablecoin_objects)
 
     return df
+  
+
+  # ==================================================
+  # -- General Helpers
+  # ==================================================
+  def sortColumns(self, df, app_count = int()): 
+    df = df[df.columns[df.fillna(0).astype(int).iloc[-1].argsort()]]
+    df = df[df.columns[::-1]]
+
+    # -- limit columns to top 10
+    if app_count > 0:
+      df = df[df.columns[:app_count]]
+
+    return df 
 
 

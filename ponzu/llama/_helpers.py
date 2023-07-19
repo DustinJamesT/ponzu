@@ -129,7 +129,8 @@ def unpackProtocols(date_, protocols_, chain, metric):
       'date': date_,
       'chain': chain,
       'protocol': protocol,
-       metric: value
+      'metric': metric,
+      'value': value
     })
     
   return unpacked
