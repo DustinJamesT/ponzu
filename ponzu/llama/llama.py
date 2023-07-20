@@ -124,7 +124,11 @@ class Llama:
     data = getFundamentalsByChain_(chain, metric)
 
     # -- process data
-    df = processFundamentalsByChain_(data, chain, metric)
+    if data == {}:
+      # -- return empty df
+      df = pd.DataFrame(columns=['date', 'chain', 'protocol', 'parentProtocol', 'category', 'metric', 'value'])
+    else:
+      df = processFundamentalsByChain_(data, chain, metric)
 
     return df
   

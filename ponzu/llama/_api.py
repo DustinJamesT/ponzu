@@ -159,7 +159,12 @@ def getFundamentalsByChain_api(chain, metric = 'fees'):
 
   # -- call url
   resp = requests.get(url)
-  data = resp.json()
+
+  try:
+    data = resp.json()
+  except:
+    print(f'Error: {chain}: {metric} - Response Status: {resp.status_code} - {url} ')
+    data = {}
 
   return data 
 

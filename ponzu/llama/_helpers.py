@@ -110,16 +110,17 @@ def aggTVLtypes(df, include = ['borrowed']):
 
 
 def getMetricTypeDefaults(metric):
+
   metrics = {
     'fees': ('dailyFees', 'fees'),
     'revenue': ('dailyRevenue', 'fees'),
     'volume': ('dailyVolume', 'dexs'),
   }
 
-  metric = metrics[metric][0] if metric in metrics.keys() else 'dailyFees'
+  metric_ = metrics[metric][0] if metric in metrics.keys() else 'dailyFees'
   metric_type = metrics[metric][1] if metric in metrics.keys() else 'fees'
-  
-  return metric, metric_type
+
+  return metric_, metric_type
 
 
 def unpackProtocols(date_, protocols_, chain, metric):
