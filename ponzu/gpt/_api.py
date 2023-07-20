@@ -63,6 +63,14 @@ def loadYoutubeLoader(url):
 
   return transcript
 
+def predict(prompt, temp = 0.6, model = 'chat'):
+  llm = loadLLM(temp=temp, model=model)
+
+  prediction = llm.predict(prompt)
+
+  return prediction
+
+
 # ==================================================
 # -- Vector Stores
 # ==================================================

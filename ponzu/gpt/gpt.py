@@ -6,7 +6,8 @@ from ..twitter import twitter
 
 from ._api import (loadLLM,
                    addTextToVectorStore_api,
-                   retrieveCompressedDocs_api)
+                   retrieveCompressedDocs_api,
+                   predict)
 
 from ._actions import (summarizeText,
                        chatVectorstore,
@@ -83,6 +84,11 @@ class GPT():
     summary = summarizeText(text, prompt, temp = temp, chuck_size=chuck_size, overlap=overlap, chain_type=chain_type)
 
     return summary
+  
+  def predict(self, prompt, temp = 0.6, model = 'chat'):
+    prediction = predict(prompt, temp = temp, model = model)
+
+    return prediction
 
 
   # ==================================================
