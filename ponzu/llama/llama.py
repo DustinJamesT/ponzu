@@ -211,7 +211,7 @@ class Llama:
   # -- Yields
   # ==================================================
 
-  def getHistoricalYields(self, chains = [], tokens = [], protocols = [], tvl_cutoff = 1000000, save_state = False, chunk_size = 60):
+  def getHistoricalYields(self, chains = [], tokens = [], protocols = [], tvl_cutoff = 1000000, save_state = False, chunk_size = 60, sleep = 60):
 
     # -- set defaults if not provided (will take a long time to run. intentially allowed to run without parameters)
     chains = chains if len(chains) > 0 else self.default_chains
@@ -243,12 +243,13 @@ class Llama:
       dfs.append(yields_df)
 
       if len(pool_chunks) > 1 and i < len(pool_chunks) - 1:
-        print('... Sleeping for 60 seconds')
-        time.sleep(60)
+        print('... Sleeping for ' + str(sleep) +  ' seconds')
+        time.sleep(sleep)
 
     # -- retry bad pools 
     if len(bad_ids) > 0:
-      time.sleep(30)
+      print('Retrying bad pools -- count: ' + str(len(bad_ids)))
+      time.sleep(sleep)
       yields_data = run_async(getPoolsHistoricalYields_api, bad_ids) 
       yields_df = processPoolData_(yields_data, pools_df)
       dfs.append(yields_df)
