@@ -132,3 +132,8 @@ def chatVectorstore(vectorstore, query, memory = [], return_memory = False, mode
     return result['answer'], memory
 
   return result['answer'] 
+
+
+# ==================================================
+# -- Tags   
+# ==================================================
