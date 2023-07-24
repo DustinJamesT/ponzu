@@ -1,88 +1,88 @@
 from llama.llama import Llama
 import pandas as pd
 
-class CuratedLlama(Llama):
+class CuratedTVL(Llama):
     def __init__(self):
         super().__init__()  # call Llama's __init__ method
-        self.date = None
-        self.raw_data = None
-        self.curated_data = None
+        self.tvl = None
+        self.raw_tvl = None
+        self.curated_tvl = None
 
-    def fetch_data(self, chains):
-        if self.raw_data is None:
-            self.raw_data = self.getChainTVL(chains)
-            self._reclassify_data() # need to do this early on so when we call liquid staking using fetch_data eos-rex is included
-        return self.raw_data
+    def fetch_tvl(self, chains):
+        if self.raw_tvl is None:
+            self.raw_tvl = self.getChainTVL(chains)
+            self._reclassify_tvl()
+        return self.raw_tvl
 
-    def _reclassify_data(self):
-        self.raw_data.loc[self.raw_data['protocol'] == 'eos-rex', 'category'] = 'Liquid Staking'
-        self.raw_data.loc[self.raw_data['protocol'] == 'atomichub', 'category'] = 'NFT Marketplace'
+    def _reclassify_tvl(self):
+        self.raw_tvl.loc[self.raw_tvl['protocol'] == 'eos-rex', 'category'] = 'Liquid Staking'
+        self.raw_tvl.loc[self.raw_tvl['protocol'] == 'atomichub', 'category'] = 'NFT Marketplace'
 
-    def curate_data(self, chains):
+    def curate_tvl(self, chains):
         curated_chains = ['ethereum','tron','binance','arbitrum','polygon','optimism','avalanche','fantom','solana','cardano','eos','tezos','aptos','near','stacks','sui','hedera','aurora','eos evm','wax','europa']
         for chain in chains:
             if chain not in curated_chains:
                 return f"Error: {chain} is not in the curated list of chains." 
-        if self.raw_data is None:
-            self.fetch_data(chains)
+        if self.raw_tvl is None:
+            self.fetch_tvl(chains)
 
-        self._filter_data()
-        return self.curated_data
+        self._filter_tvl()
+        return self.curated_tvl
 
-    def _filter_data(self):
-        df = self.raw_data[(self.raw_data['type'] == 'tvl') | (self.raw_data['type'] == 'borrowed')]
+    def _filter_tvl(self):
+        df = self.raw_tvl[(self.raw_tvl['type'] == 'tvl') | (self.raw_tvl['type'] == 'borrowed')]
         exclude_categories = ['CEX', 'Chain', 'Yield', 'Bridge', 'Liquid Staking', 'Liquidity manager', 'RWA', 'Gaming', 'NFT Marketplace', 'Leveraged Farming', 'Prediction Market']
         df = df[~df['category'].isin(exclude_categories)]
         exclude_protocols = ['ribbon','frax','unslashed','sturdy','alongside','illuminate','instadapp','defisaver','pooltogether','cian','ubiquity-dao','sandclock','templedao','unbound','axia-protocol','tornado-cash','aztec','tronnrg','garble.money','sperax-demeter','volta-finance','uniwswap-unia-farms','mm-stableswap-polygon','zkbob','brokkr-finance','defrost','sherpa-cash','sturdy','shadecash','zeta']
         df = df[~df['protocol'].isin(exclude_protocols)]
-        self.curated_data = df
+        self.curated_tvl = df
         return df
     
-    def _prepare_data(self, chains, curated):
+    def _prepare_tvl(self, chains, curated):
         if curated:
-            self.data = self.curate_data(chains)
+            self.tvl = self.curate_tvl(chains)
         else:
-            self.data = self.fetch_data(chains)
+            self.tvl = self.fetch_tvl(chains)
 
-    def _get_pivot_table(self, values, index, columns, aggfunc, data=None):
-        if data is None:
-            data = self.data
-        return pd.pivot_table(data, values=values, index=index, columns=columns, aggfunc=aggfunc)
+    def _get_pivot_table(self, values, index, columns, aggfunc, tvl=None):
+        if tvl is None:
+            tvl = self.tvl
+        return pd.pivot_table(tvl, values=values, index=index, columns=columns, aggfunc=aggfunc)
 
     def chain_tvl(self, chains, curated=False):
-        self._prepare_data(chains, curated)
+        self._prepare_tvl(chains, curated)
         return self._get_pivot_table('tvl', 'date', 'chain', sum)
 
     def chain_protocols_tvl(self, chains, curated=False):
-        self._prepare_data(chains, curated)
+        self._prepare_tvl(chains, curated)
         tvl_protocols = {}
         for chain in chains:
-            tvl_protocols_chain = self.data[self.data['chain'] == chain]
+            tvl_protocols_chain = self.tvl[self.tvl['chain'] == chain]
             tvl_protocols[f'tvl_protocols_{chain}'] = pd.pivot_table(tvl_protocols_chain, values='tvl', index='date', columns='protocol', aggfunc=sum)
 
         return tvl_protocols
 
     def chain_tvb(self, chains, curated=False):
-        self._prepare_data(chains, curated)
-        df_borrows = self.data[self.data['type'] == 'borrowed']
+        self._prepare_tvl(chains, curated)
+        df_borrows = self.tvl[self.tvl['type'] == 'borrowed']
         return self._get_pivot_table('tvl', 'date', 'chain', sum, df_borrows)
 
     def chain_protocols_tvb(self, chains, curated=False):
-        self._prepare_data(chains, curated)
+        self._prepare_tvl(chains, curated)
         tvb_protocols = {}
         for chain in chains:
-            tvb_protocols_chain = self.data.loc[(self.data['type'] == 'borrowed') & (self.data['chain'] == chain)]
+            tvb_protocols_chain = self.tvl.loc[(self.tvl['type'] == 'borrowed') & (self.tvl['chain'] == chain)]
             tvb_protocols[f'tvb_protocols_{chain}'] = pd.pivot_table(tvb_protocols_chain, values='tvl', index='date', columns='protocol', aggfunc=sum)
         return tvb_protocols
 
     def chain_liquid_staking(self, chains):
-        self._prepare_data(chains, False) ##need to reassign protocols to liquid staking earlier
-        df_liquid_staking = self.data[self.data['category'] == 'Liquid Staking']
+        self._prepare_tvl(chains, False) 
+        df_liquid_staking = self.tvl[self.tvl['category'] == 'Liquid Staking']
         return self._get_pivot_table('tvl', 'date', 'chain', sum, df_liquid_staking)
     
     def chain_protocols_liquid_staking(self, chains):
-        self._prepare_data(chains, False)
-        df_liquid_staking = self.data[self.data['category'] == 'Liquid Staking']
+        self._prepare_tvl(chains, False)
+        df_liquid_staking = self.tvl[self.tvl['category'] == 'Liquid Staking']
         ls_protocols = {}
         for chain in chains:
             ls_chain = df_liquid_staking[df_liquid_staking['chain'] == chain]
@@ -113,20 +113,18 @@ class CuratedLlama(Llama):
                 defi_diversity_chains = pd.merge(defi_diversity_chains, defi_diversity_protocol, how='outer', on='date')
 
         defi_diversity_chains.sort_index(ascending=True, inplace=True)
-        defi_diversity_chains.index.name = 'DATE'
 
         return defi_diversity_chains
 
-    """
+    
     def chain_dex_volume(self, chain):
-        df = self.getChainMetrics(chain, ['volume']) 
+        df = self.getFundamentalsByChains(chain, ['volume']) 
         df = df[df['type'] == 'volume']
         df_total = pd.pivot_table(df, values='value', index='date', columns='chain', aggfunc=sum)
         df_total.index.name = 'DATE'
         df_protocol = pd.pivot_table(df, values='value', index='date', columns='protocol', aggfunc=sum)
         df_protocol.index.name = 'DATE'
         return df_total, df_protocol
-    """
 
     def llama_unique_chain(self):
         return self.llama.getProtocols().chain.unique()
