@@ -211,7 +211,7 @@ class Llama:
   # -- Yields
   # ==================================================
 
-  def getHistoricalYields(self, chains = [], tokens = [], protocols = [], tvl_cutoff = 1000000, save_state = False):
+  def getHistoricalYields(self, chains = [], tokens = [], protocols = [], tvl_cutoff = 1000000, save_state = False, chunk_size = 60, sleep = 60):
 
     # -- set defaults if not provided (will take a long time to run. intentially allowed to run without parameters)
     chains = chains if len(chains) > 0 else self.default_chains
@@ -227,7 +227,7 @@ class Llama:
     pool_ids = list(pools_df.pool.unique())
 
     # -- chunk into 500/min pools to avoid api rate limit
-    pool_chunks = [pool_ids[i:i + 175] for i in range(0, len(pool_ids), 175)]
+    pool_chunks = [pool_ids[i:i + chunk_size] for i in range(0, len(pool_ids), chunk_size)]
 
     print('Number of pools: ', len(pool_ids))
     print('Number of chunks: ', len(pool_chunks))
@@ -243,12 +243,13 @@ class Llama:
       dfs.append(yields_df)
 
       if len(pool_chunks) > 1 and i < len(pool_chunks) - 1:
-        print('Sleeping...')
-        time.sleep(60)
+        print('... Sleeping for ' + str(sleep) +  ' seconds')
+        time.sleep(sleep)
 
     # -- retry bad pools 
     if len(bad_ids) > 0:
-      time.sleep(30)
+      print('Retrying bad pools -- count: ' + str(len(bad_ids)))
+      time.sleep(sleep)
       yields_data = run_async(getPoolsHistoricalYields_api, bad_ids) 
       yields_df = processPoolData_(yields_data, pools_df)
       dfs.append(yields_df)

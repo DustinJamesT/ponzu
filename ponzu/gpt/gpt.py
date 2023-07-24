@@ -14,7 +14,8 @@ from ._actions import (summarizeText,
                        generateTextLLM)
 
 from ._chains import (generationChain,
-                      simpleLlmFunction)
+                      simpleLlmFunction,
+                      dateChain)
 
 from ._helpers import (combineDocText,)
 
@@ -89,6 +90,11 @@ class GPT():
     prediction = predict(prompt, temp = temp, model = model)
 
     return prediction
+  
+  def getDate(self, prompt, temp = 0.6, model = 'chat'):
+    output_date = dateChain(prompt, temp = temp, model = model)
+
+    return output_date
 
 
   # ==================================================

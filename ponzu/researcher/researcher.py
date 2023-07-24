@@ -3,6 +3,7 @@
 
 # -- local package imports
 from ..gpt.gpt import GPT
+import time 
 
 # -- local imports
 from ._helpers import (standardizeLinkListFormat,
@@ -93,6 +94,9 @@ class Researcher(GPT):
     for source_object in source_objects:
       source_object['summary'] = self.summarizeText(source_object['text'], summary_detail = 'medium')
       source_object['title'] = self.generateTitle(source_object['summary'])
+
+      if len(source_objects) > 30:
+        time.sleep(0.35)
 
       source_object['summary'] = source_object['title'] + ' \n ' + source_object['summary'] if include_title else source_object['summary'] 
 

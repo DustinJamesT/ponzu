@@ -7,6 +7,8 @@ from langchain.chains.summarize import load_summarize_chain
 
 from langchain.prompts import PromptTemplate
 
+from langchain.output_parsers import DatetimeOutputParser
+
 # -- local imports 
 from ._api import loadLLM
 
@@ -55,4 +57,31 @@ def simpleLlmFunction(schema, model = 'chat', temp = 0.3):
   llm = loadLLM(model = model, temp=temp)
   chain = create_tagging_chain(schema, llm)
   return chain
+
+def dateChain(text, model = 'chat', temp = 0.3):
+  llm = loadLLM(model = model, temp=temp)
+
+  output_parser = DatetimeOutputParser()
+
+  template = """Answer the users question:
+
+  {question}
+
+  {format_instructions}"""
+
+  prompt = PromptTemplate.from_template(
+      template,
+      partial_variables={"format_instructions": output_parser.get_format_instructions()},
+  )
+
+  chain = LLMChain(prompt=prompt, llm=llm)
+
+  output = chain.run("What date is mentioned in the text? #### TEXT #### " + text + " #### END TEXT ####")
+
+  date_output = output_parser.parse(output)
+
+  return date_output
+
+
+
 
