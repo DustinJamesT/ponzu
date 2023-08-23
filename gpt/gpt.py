@@ -42,7 +42,7 @@ class GPT():
   # -- Vectorization
   # ==================================================
 
-  def vectorizeText(self, text, metadata = dict(), return_vectorstore = False):
+  def vectorizeText(self, text, metadata = {}, return_vectorstore = False):
     if len(metadata) > 0: 
       vectorstore = addTextToVectorStore_api(self.vectorstore, text, metadata = metadata)
     else: 
