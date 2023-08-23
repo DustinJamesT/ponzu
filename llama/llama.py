@@ -101,7 +101,6 @@ class Llama:
       
     # -- process data into dataframe
     df = processProtocolData_(protocol_data, chains, self.protocols_)
-    
     #self.tvls = df
     
     return df
@@ -175,10 +174,7 @@ class Llama:
     for chain in chains:
       # -- TODO - handle various lower or capitalized inputs 
       #chains = [chain.lower() for chain in chains]
-      if chain not in self.default_chains:
-        if chain.capitalize() in self.default_chains:
-          chains[chains.index(chain)] = chain.capitalize()
-        else:
+      if chain.lower() not in self.chains_['name_lower'].unique():
           chains.remove(chain)
           raise ValueError(f'{chain} is not a valid chain')
       

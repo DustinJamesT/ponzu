@@ -24,7 +24,7 @@ class Artemis:
     self.valid_metrics_bam = ['activeAddresses', 'transactions', 'gasPaid']
     
     # -- set default chains and metrics 
-    self.default_chains = ['avalanche','ethereum','polygon','solana', 'arbitrum', 'optimism', 'bsc']
+    self.default_chains = ['avalanche','ethereum','polygon','solana', 'arbitrum', 'optimism', 'bsc', 'base']
     self.defualt_metrics = ['DAU', 'DEX_VOLUMES', 'TVL', 'DAILY_TXNS', 'FEES', 'REVENUE', 'MC', 'STABLECOIN_MC']
 
     self.default_chains_bam = self.valid_chains_bam
