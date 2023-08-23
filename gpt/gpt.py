@@ -43,12 +43,15 @@ class GPT():
   # ==================================================
 
   def vectorizeText(self, text, metadata = dict(), return_vectorstore = False):
-    vectorstore = addTextToVectorStore_api(self.vectorstore, text) if len(metadata) == 0 else addTextToVectorStore_api(self.vectorstore, text, metadata = metadata)
+    if len(metadata) > 0: 
+      vectorstore = addTextToVectorStore_api(self.vectorstore, text, metadata = metadata)
+    else: 
+      vectorstore = addTextToVectorStore_api(self.vectorstore, text)
+
+    self.vectorstore = vectorstore
     
     if return_vectorstore:
       return vectorstore
-    
-    self.vectorstore = vectorstore
 
 
   def chatVectorstore(self, query, model = 'chat'): 

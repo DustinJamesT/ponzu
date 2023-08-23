@@ -113,7 +113,10 @@ class Researcher(GPT):
     for source_object in source_objects:
       # -- get source object without text key 
       metadata_ = {k: v for k, v in source_object.items() if k != 'text'}
-      self.vectorizeText(source_object['text'], metadata=metadata_ )
+      if len(metadata_) > 0: 
+        self.vectorizeText(source_object['text'], metadata=metadata_ )
+      else: 
+        self.vectorizeText(source_object['text'])
 
   # ==================================================
   # -- Report Writer 
