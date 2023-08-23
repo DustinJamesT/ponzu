@@ -683,11 +683,3 @@ class Researcher(GPT):
     follow_up_analysis = self.generateTextLLMContext(prompt_function=prompt_function, inputs=inputs, vectorstore=self.vectorstore, context_query = analysis, max_runs=3, temp=0.2, model=self.text_model)
 
     return follow_up_analysis
-
-
-    
-
-
-
-  
-  
