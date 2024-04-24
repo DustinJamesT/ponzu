@@ -54,7 +54,9 @@ def getSubprotocolCategory(protocol_data, protocols_df):
       category = str(categories).replace('[', '').replace(']', '').replace(' ', '').replace("'", "")
   
   else:
-    raise ValueError(f'No category found for {protocol_data["name"]}')
+    print(f'Warning -- No category found for {protocol_data["name"]}')
+    category = 'Unknown'
+    #raise ValueError(f'No category found for {protocol_data["name"]}')
 
   return category
 

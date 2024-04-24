@@ -5,6 +5,8 @@
 import pandas as pd
 import asyncio
 import time
+import os
+import json
 
 # -- local imports
 from ._api import getProtocols_api, getProtocolsData_, getChains_api, getYieldPools_api, getPoolsHistoricalYields_api, getFundamentalsByProtocol_api
@@ -47,6 +49,9 @@ class Llama:
     self.nfts_ = pd.DataFrame()
     self.nfts = pd.DataFrame()
 
+    self.call_history = []
+    self.save_call_history = False
+
     # -- define variables 
     self.included_tvl_types = ['borrowed']
     self.excluded_protocol_categories = ['CEX', 'Chain']
@@ -58,6 +63,11 @@ class Llama:
     self.default_metrics = ['tvl', 'borrowed', 'fees', 'volume', 'revenue']
   
     self.sleep = 0.126    # -- sleep time between requests (in seconds)
+
+    # -- import config_curated
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(current_dir, 'config_curated.json')) as json_file:
+        self.config = json.load(json_file)
 
   # ==================================================
   # -- Protocols
@@ -72,7 +82,7 @@ class Llama:
   # -- TVLs
   # ==================================================
   
-  def getChainTVL(self, chains = [], includeMultiChain = True, categories = [], exclude_categories = [], tvl_cutoff = 0):
+  def getChainTVL(self, chains = [], protocols = [], includeMultiChain = True, categories = [], exclude_categories = [], tvl_cutoff = 0, chunk_size = 450):
     # -- Returns df of protocol tvl by chain and type with columns: ['date', 'chain', 'protocol', 'category', 'type', 'tvl']
     # ---- > Logic: 1) Set api params to defaults if not provided 2) filter protocol list on params 3) call async api. 4) process/combine data 5) return df
 
@@ -81,20 +91,23 @@ class Llama:
     exclude_categories = exclude_categories if len(exclude_categories) > 0 else self.excluded_protocol_categories
 
     # -- filter protocols based on chains and other parameters (will lowercase chains -- future note to change this)
-    protocols_df = filterProtocols_(df = self.protocols_, chains = chains, tvl_cutoff = tvl_cutoff, includeMultiChain = includeMultiChain, categories = categories, exclude_categories = exclude_categories)
-
+    protocols_df = filterProtocols_(df = self.protocols_, chains = chains, protocols = protocols, tvl_cutoff = tvl_cutoff, includeMultiChain = includeMultiChain, categories = categories, exclude_categories = exclude_categories)
+    self.call_history.append({'function': 'getChainTVL-filterProtocols', 'chains': chains, 'data': protocols_df}) if self.save_call_history else None
+                              
     # -- get unprocessed tvl data
     protocols = protocols_df['slug'].unique()
 
     # -- break into chunks of 500 protocols to avoid api rate limit
-    protocol_chunks = [protocols[i:i + 450] for i in range(0, len(protocols), 450)]
+    protocol_chunks = [protocols[i:i + chunk_size] for i in range(0, len(protocols), chunk_size)]
     
     # -- get protocol data
     protocol_data = []
-    for chunk in protocol_chunks:
+    for i, chunk in enumerate(protocol_chunks):
       protocol_data_ = run_async(getProtocolsData_, chunk) 
       protocol_data.extend(protocol_data_)
-      time.sleep(60)
+      time.sleep(60) if i < len(protocol_chunks) - 1 else None
+
+    self.call_history.append({'function': 'getChainTVL-getProtocolData', 'chains': chains, 'data': protocol_data}) if self.save_call_history else None
 
     # -- old code for getting protocol data
     #protocol_data = run_async(getProtocolsData_, protocols) 
@@ -102,8 +115,63 @@ class Llama:
     # -- process data into dataframe
     df = processProtocolData_(protocol_data, chains, self.protocols_)
     #self.tvls = df
+
+    df['date'] = pd.to_datetime(df['date']).dt.date
     
     return df
+  
+  def getCuratedTVL(self, raw_tvl=None, chains=[]):
+    if raw_tvl is None:
+      remove_chains = []
+      for chain in chains:
+        if chain not in self.config['curated_chains']:
+          print(f"Error: {chain} is not in the curated list of chains.")
+          remove_chains.append(chain)
+      for chain in remove_chains:
+        chains.remove(chain)
+      df = self.getChainTVL(chains)
+    else:
+      unique_chains = raw_tvl['chain'].unique()
+      remove_chains = [chain for chain in unique_chains if chain not in self.config['curated_chains']]
+      df = raw_tvl[~raw_tvl['chain'].isin(remove_chains)]
+    
+    # -- reclassify categories of protocols wrongly classified on DefiLlama
+    for protocol, category in self.config['reclassification_rules'].items():
+      df.loc[df['protocol'] == protocol, 'category'] = category
+
+    ## -- exclude categories and protocols to better match up with front-end, see here for documentation: https://www.notion.so/DefiLlama-Backend-Frontend-Effort-aa8ab5725db94a248c743a86099b1aa0
+    exclude_categories = self.config['exclude_categories']
+    df = df[~df['category'].isin(exclude_categories)]
+    exclude_protocols = self.config['exclude_protocols']
+    df = df[~df['protocol'].isin(exclude_protocols)]
+    
+    ## -- tvl = tvl or borrowed
+    df = df[(df["type"] == "tvl") | (df["type"] == "borrowed")]
+    
+    return df
+  
+  def getTokenTVL(self, chains = [], protocols = [], categories = []):
+
+    # -- TODO set defaults if not provided and not be dumb about it 
+    if len(chains) == 0 and len(protocols) == 0 and len(categories) == 0:
+      chains = chains if len(chains) > 0 else self.default_chains
+
+    # -- get protocol data 
+    temp = self.save_call_history
+    self.save_call_histroty = True 
+    df = self.getChainTVL(chains = chains, protocols = protocols, categories=categories)
+
+    self.save_call_history = temp 
+    self.call_history.append({'function': 'getTokenTVL-get raw data in history', 'protocols': protocols, 'data': df}) if self.save_call_history else None
+
+    # -- process token-level data 
+    data = self.call_history[-2]['data'] # -- get raw data from history. little janky rather spilt up the above formula before process raw data
+    df = processProtocolData_(data, chains, self.protocols_, token_level=True)
+    self.call_history.append({'function': 'getTokenTVL-process results', 'protocols': protocols, 'data': df}) if self.save_call_history else None
+
+    df['date'] = pd.to_datetime(df['date']).dt.date
+
+    return df 
   
   # ==================================================
   # -- Fundementals
@@ -123,17 +191,23 @@ class Llama:
     # -- get api data 
     data = getFundamentalsByChain_(chain, metric)
 
-    # -- process data
+    # -- return empty df if no data 
     if data == {}:
-      # -- return empty df
       df = pd.DataFrame(columns=['date', 'chain', 'protocol', 'parentProtocol', 'category', 'metric', 'value'])
-    else:
-      df = processFundamentalsByChain_(data, chain, metric)
+      return df 
+
+    if 'totalDataChartBreakdown' in data.keys():
+      if len(data['totalDataChartBreakdown']) == 0:
+        df = pd.DataFrame(columns=['date', 'chain', 'protocol', 'parentProtocol', 'category', 'metric', 'value'])
+        return df
+
+    # -- process data if df not empty
+    df = processFundamentalsByChain_(data, chain, metric)
 
     return df
   
   def getFundamentalsByChains(self, chains = list(), metrics = list()):
-    chains = self.default_chain if len(chains) == 0 else chains
+    chains = self.default_chains if len(chains) == 0 else chains
     metrics = self.default_metrics if len(metrics) == 0 else metrics
 
     dfs = []
@@ -174,10 +248,7 @@ class Llama:
     for chain in chains:
       # -- TODO - handle various lower or capitalized inputs 
       #chains = [chain.lower() for chain in chains]
-      if chain not in self.default_chains:
-        if chain.capitalize() in self.default_chains:
-          chains[chains.index(chain)] = chain.capitalize()
-        else:
+      if chain.lower() not in self.chains_['name_lower'].unique():
           chains.remove(chain)
           raise ValueError(f'{chain} is not a valid chain')
       
@@ -293,11 +364,17 @@ class Llama:
 
     # -- retrieve historical stablecoin pricing data
     price_data = getStablecoinPrices_api()
+    self.call_history.append({'function': 'stablecoinHistory-getStablecoinPrices_api', 'chains': chains, 'data': price_data}) if self.save_call_history else None
+    
     price_dict = buildStablecoinPriceDict_(price_data)
+    self.call_history.append({'function': 'stablecoinHistory-buildStablecoinPriceDict_', 'chains': chains, 'data': price_dict}) if self.save_call_history else None
 
     # -- get stablecoin history for each stablecoin object 
-    stables_data = run_async(getStablecoinsHistory_, stable_objects) 
+    stables_data = run_async(getStablecoinsHistory_, stable_objects)
+    self.call_history.append({'function': 'stablecoinHistory-async getStablecoinsHistory_', 'chains': chains, 'data': stables_data}) if self.save_call_history else None
+
     stables_df = processStablesHistory(stable_objects, stables_data, price_dict)
+    self.call_history.append({'function': 'stablecoinHistory-processStablesHistory', 'chains': chains, 'data': stables_df}) if self.save_call_history else None
 
     # -- filter df by chains
     if len(chains) > 0:

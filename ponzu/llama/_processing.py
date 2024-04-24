@@ -17,7 +17,7 @@ from ._helpers import remapCategories, aggTVLtypes, parseTVLtype, getSubprotocol
 # -- TVL 
 # ==================================================
 
-def filterProtocols_(df = '', tvl_cutoff = 0, chains = [], includeMultiChain = True, categories = [], exclude_categories = ['CEX', 'Chain']):
+def filterProtocols_(df = '', tvl_cutoff = 0, chains = [], protocols = [], includeMultiChain = True, categories = [], exclude_categories = ['CEX', 'Chain']):
 
   if len(df) < 1:
     df = getProtocols_api()
@@ -28,6 +28,14 @@ def filterProtocols_(df = '', tvl_cutoff = 0, chains = [], includeMultiChain = T
   # -- remap categories 
   df = remapCategories(df)
 
+  # -- filter by protocol
+  if len(protocols) > 0:
+    #df['parentProtocol'] = df['parentProtocol'].apply(lambda x: str(x))
+    df['parentProtocol'] = df['parentProtocol'].apply(lambda x: str(x).split('#')[-1])
+    df['parentProtocol'] = df['parentProtocol'].apply(lambda x: x.lower())
+    protocols = [protocol.lower() for protocol in protocols]
+    df = df[(df['parentProtocol'].isin(protocols)) | (df['slug'].isin(protocols))]
+
   # -- filter by category
   if len(categories) > 0:
     df = df[df['category'].isin(categories)]
@@ -35,6 +43,21 @@ def filterProtocols_(df = '', tvl_cutoff = 0, chains = [], includeMultiChain = T
   # -- filter by exclude category
   if len(exclude_categories) > 0:
     df = df[~df['category'].isin(exclude_categories)]
+
+  # -- print chains where the type is not a string
+  #print('Length of chains: ', len(df['chain'].unique())) if len(df['chain'].unique()) > 0 else None
+  #print('Length of nan chains: ', len(df[df['chain'].isna()])) if len(df[df['chain'].isna()]) > 0 else None
+
+  # -- convert chains to string
+  df['chain'] = df['chain'].apply(lambda x: str(x))
+
+
+  bad_chains = []
+  for chain in df['chain'].unique():
+    if type(chain) != str:
+      bad_chains.append({chain: type(chain)})
+  
+  print(bad_chains) if len(bad_chains) > 0 else None
 
   #  -- make chains lower case
   chains = [chain.lower() for chain in chains]
@@ -45,15 +68,24 @@ def filterProtocols_(df = '', tvl_cutoff = 0, chains = [], includeMultiChain = T
     # -- print warning if chain is not in df
     for chain in chains:
       if chain not in df['chain'].unique():
-        print(f'Warning: {chain} not in df')
+        #print(f'Warning: {chain} not in df')
+        None 
     
     # -- filter df by chains
-    chains.append('multi-chain') if includeMultiChain else None
-    df = df[df['chain'].isin(chains)]
+        
+    # ... old code: added multi-chain back to chains. resulted in long code execution thats not necessary
+    #chains.append('multi-chain') if includeMultiChain else None
+    #df = df[df['chain'].isin(chains)]
+        
+    # -- make lowercase all chains 
+    df['chains'] = df['chains'].apply(lambda x: [item.lower() for item in x])
+
+    # -- filter protocol df if any of the included chains are in the chains column
+    df = df[df['chains'].apply(lambda x: any(item in x for item in chains))]
 
   return df
 
-def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes = False): 
+def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes = False, token_level = False): 
   # -- initialize data store 
   data_ = []
 
@@ -83,24 +115,53 @@ def processProtocolData_(protocol_data, chains, protocols_df, aggregateTVLtypes 
 
       # -- unpack data if not an excluded subtype
       if chain_ not in exlcuded_subtypes:
-        for dailyData in tvl_data['tvl']:
-          data_.append({
-            'date': dailyData['date'],
-            'chain': chain_,
-            'protocol': protocol,
-            'parentProtocol': data['parentProtocol'],
-            'category': data['category'],
-            'type': tvl_type,
-            'tvl': dailyData['totalLiquidityUSD']
-            })
+        if token_level:
+          if 'tokensInUsd' in tvl_data.keys():
+            for dailyData in tvl_data['tokensInUsd']:
+              for token, value in dailyData['tokens'].items():
+                data_.append({
+                  'date': dailyData['date'],
+                  'chain': chain_,
+                  'protocol': protocol,
+                  'parentProtocol': data['parentProtocol'],
+                  'category': data['category'],
+                  'type': tvl_type,
+                  'token': token,
+                  'tvl': value
+                  })
+          else:  
+            for dailyData in tvl_data['tvl']:
+              data_.append({
+                'date': dailyData['date'],
+                'chain': chain_,
+                'protocol': protocol,
+                'parentProtocol': data['parentProtocol'],
+                'category': data['category'],
+                'type': tvl_type,
+                'token': 'none',
+                'tvl': dailyData['totalLiquidityUSD']
+                })
+        else:
+          for dailyData in tvl_data['tvl']:
+            data_.append({
+              'date': dailyData['date'],
+              'chain': chain_,
+              'protocol': protocol,
+              'parentProtocol': data['parentProtocol'],
+              'category': data['category'],
+              'type': tvl_type,
+              'tvl': dailyData['totalLiquidityUSD']
+              })
           
   # -- convert to dataframe
   df = pd.DataFrame(data_)
 
-  # -- filter by chain
-  df = df[df['chain'].isin(chains)]
+  # -- filter by chain 
+  if len(chains) > 0:
+    chains = [chain.lower() for chain in chains]
+    df = df[df['chain'].isin(chains)]
 
-  df['date'] = pd.to_datetime(df['date'], unit='s')
+  df['date'] = pd.to_datetime(df['date'], unit='s', utc=True)
 
   # -- drop rows with date with hour and mintues greater than 0 
   df = df[df['date'].dt.hour == 0]
@@ -133,7 +194,7 @@ def processFundamentalsByChain_(data, chain, metric = 'fees'):
 
   # -- format df columns
   df.columns = ['date', metric]
-  df['date'] = pd.to_datetime(df['date'], unit='s')
+  df['date'] = pd.to_datetime(df['date'], unit='s', utc=True)
   df['date'] = pd.to_datetime(df['date'])
 
   # -- unpack protocols
@@ -141,6 +202,14 @@ def processFundamentalsByChain_(data, chain, metric = 'fees'):
   df.apply(lambda row: data_.extend(unpackProtocols(row['date'], row[metric], chain, metric)), axis=1)
 
   df_ = pd.DataFrame(data_)
+
+  # -- exit if no data
+  if df_.empty: 
+    print(f'warning: no data for {chain} {metric}')
+    print(data)
+    # -- add columns ['date', 'chain', 'protocol', 'parentProtocol', 'category', 'metric', 'value']
+    df_ = pd.DataFrame(columns = ['date', 'chain', 'protocol', 'parentProtocol', 'category', 'metric', 'value'])
+    return df_
 
   # -- add category column and parent column 
   protocol_data = {}
@@ -172,7 +241,7 @@ def processFundamentalsByProtocol_(data, metric = 'fees'):
 
   # -- format df columns
   df.columns = ['date', metric]
-  df['date'] = pd.to_datetime(df['date'], unit='s')
+  df['date'] = pd.to_datetime(df['date'], unit='s', utc=True)
   df['date'] = pd.to_datetime(df['date'])
 
   return df
@@ -352,19 +421,23 @@ def processStablesList_(data):
   data_ = []
 
   for stable in data['peggedAssets']:
-    if 'peggedUSD' in stable['circulating'].keys():
+    if 'peggedUSD' in stable['circulating'].keys() or 'peggedEUR' in stable['circulating'].keys():
 
       price = stable['price'] if stable['price'] is not None else 1
       #stable['chains'] = [chain.lower() for chain in stable['chains']]
+
+      # -- get peg key 
+      peg_key = stable['pegType'] if 'pegType' in stable.keys() else 'peggedUSD'
 
       data_.append({
         'id': stable['id'],
         'gecko_id': stable['gecko_id'],
         'symbol': stable['symbol'],
-        'mcap': float(stable['circulating']['peggedUSD']) * float(price),
-        'supply': stable['circulating']['peggedUSD'] ,
+        'mcap': float(stable['circulating'][peg_key]) * float(price),
+        'supply': stable['circulating'][peg_key] ,
         'pegMechanism': stable['pegMechanism'],
         'priceSource': stable['priceSource'],
+        'pegType': stable['pegType'],
         'chains': stable['chains'],
         'price': stable['price'],
         })
@@ -378,19 +451,23 @@ def processStablesHistory(stables, data, price_dict):
     for stable_data in data: 
       if stable_data['stable_id'] == stable['id']: 
 
+        peg_key = stable_data['data']['pegType'] if 'pegType' in stable_data['data'].keys() else 'peggedUSD'
+
         for chain, timeseries in stable_data['data']['chainBalances'].items():
           for dailyData in timeseries['tokens']:
-            if str(dailyData['date'])[-1] == '0':
+            if str(dailyData['date'])[-1] == '0' and dailyData['date'] in price_dict.keys():
               price = price_dict[dailyData['date']][stable['gecko_id']] if stable['gecko_id'] in price_dict[dailyData['date']].keys() else 1
               price = price if price is not None else 1
+
+              # -- 
 
               data_store.append({
                 'date': dailyData['date'],
                 'symbol': stable['symbol'],
                 'chain': chain,
-                'supply': dailyData['circulating']['peggedUSD'],
+                'supply': dailyData['circulating'][peg_key],
                 'price': price,
-                'mcap': float(dailyData['circulating']['peggedUSD']) * float(price),
+                'mcap': float(dailyData['circulating'][peg_key]) * float(price),
                 })
 
   # -- convert to df
@@ -409,12 +486,15 @@ def processStablesChartHistory(stables, data, price_dict):
       for daily_data in stable_data['data']:
         if stable_data['stable_id'] == stable['stable_id']: 
 
+          # -- get peg key 
+          peg_key = daily_data['pegType'] if 'pegType' in daily_data.keys() else 'peggedUSD'
+
           data_store.append({
             'date': daily_data['date'],
             'symbol': stable['symbol'],
             'chain': stable_data['chain'],
-            'supply': daily_data['totalCirculating']['peggedUSD'],
-            'supplyUSD': daily_data['totalCirculatingUSD']['peggedUSD'], 
+            'supply': daily_data['totalCirculating'][peg_key],
+            'supplyUSD': daily_data['totalCirculatingUSD'][peg_key], 
             })
 
 
