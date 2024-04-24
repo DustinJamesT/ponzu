@@ -4,10 +4,11 @@
 # -- standard imports 
 import pandas as pd
 import requests
+import time 
 
 # -- local imports
-from ._api import getAppSummaryTable
-from ._processing import getChainMetrics_, getChainActivityByCategory_, getChainActivityByApp_
+from ._api import getAppSummaryTable, getDevEcosystems_api, getDeveloperActivity_api
+from ._processing import getChainMetrics_, getChainActivityByCategory_, getChainActivityByApp_, processDevActivity, processEcosystems, appendAppInfo
 
 
 class Artemis: 
@@ -17,14 +18,14 @@ class Artemis:
 
     # -- define valid metrics and chains
     self.valid_metrics = ['DAU', 'DEX_VOLUMES', 'TVL', 'DAILY_TXNS', 'FEES', 'REVENUE', 'STABLECOIN_MC', 'STABLECOIN_GROWTH', 'NEW_TWITTER_FOLLOWERS', 'TWITTER_FOLLOWERS', 'MC', 'PRICE']
-    self.valid_chains  = ['aptos','avalanche','ethereum','sui','polygon','solana','arbitrum', 'optimism', 'bsc', 'axelar','zksync','tron','starknet','stacks','polygon_zk','osmosis','near','multiversx','flow','fantom','cosmoshub','cardano','canto','bitcoin']
+    self.valid_chains  = ['aptos','avalanche','ethereum','sui','polygon','solana','arbitrum', 'optimism', 'bsc', 'axelar','zksync','tron','starknet','stacks','polygon_zk','osmosis','near','multiversx','flow','fantom','cosmoshub','cardano','canto','bitcoin', 'base']
 
-    self.valid_chains_bam  = ['arbitrum','avalanche','bsc','ethereum','polygon','optimism']
+    self.valid_chains_bam  = ['arbitrum','avalanche','bsc','ethereum','polygon','optimism', 'base', 'solana', 'near', 'tron']
     self.valid_categories_bam  = ['Bridge','CeFi','DeFi','Gaming','Utility','Layer%202','Memecoin','NFT%20Apps','ERC_721','Social','Stablecoin','ERC_1155','ERC_20','EOA']
     self.valid_metrics_bam = ['activeAddresses', 'transactions', 'gasPaid']
     
     # -- set default chains and metrics 
-    self.default_chains = ['avalanche','ethereum','polygon','solana', 'arbitrum', 'optimism', 'bsc']
+    self.default_chains = ['avalanche','ethereum','polygon','solana', 'arbitrum', 'optimism', 'bsc', 'base']
     self.defualt_metrics = ['DAU', 'DEX_VOLUMES', 'TVL', 'DAILY_TXNS', 'FEES', 'REVENUE', 'MC', 'STABLECOIN_MC']
 
     self.default_chains_bam = self.valid_chains_bam
@@ -45,6 +46,8 @@ class Artemis:
 
     self.url_categories = ''
     self.url_apps = ''
+
+    self.api_key = ''
 
     # -- initialize dataframes
     self.chains_df = pd.DataFrame()
@@ -222,7 +225,7 @@ class Artemis:
     self._setDateDefaults()
 
     # -- get data from artemis
-    df = getChainMetrics_(self.chains, self.metrics, self.start_date, self.end_date)
+    df = getChainMetrics_(self.chains, self.metrics, self.start_date, self.end_date, self.api_key)
     self.chains_df = df
 
     return df
@@ -277,7 +280,7 @@ class Artemis:
 
     return df
   
-  def getChainActivityByApp(self, chains = [], categories = [], metrics = [], apps = [], start_date = '', days = 180, app_limit = 25, exclude_category = False): 
+  def getChainActivityByApp(self, chains = [], categories = [], metrics = [], apps = [], start_date = '', days = 180, chunk_size = 100, exclude_category = False): 
     # -- Returns df of chain metrics with columns: ['date', 'chain', 'metric', 'category', 'application', 'value']
     # ---- > Logic: 1) Set api params in object state. 2) edit params in state to be defaults if not provided. 3) call api. 4) process data. 5) return df
 
@@ -300,7 +303,7 @@ class Artemis:
     valid_apps = self._getValidApps()
 
     # -- break up into chunks of 100
-    chunks = [valid_apps[x:x+100] for x in range(0, len(valid_apps), 100)]
+    chunks = [valid_apps[x:x+chunk_size] for x in range(0, len(valid_apps), chunk_size)]
 
     # -- get app df for each chunk
     dfs = []
@@ -317,6 +320,48 @@ class Artemis:
 
     return df
   
+  def getDevEcosystems(self, detailed_response = False):
+    # -- Returns list of developer ecosystems. detailed_response = True returns raw response from artemis api which is list of json objects (no additional info at this time)
+    data = getDevEcosystems_api(self.api_key)
+
+    if detailed_response == True:
+      return data
+
+    return processEcosystems(data)
+  
+  def getDeveloperActivity(self, ecosystems = [], days_back = 365, include_forks = False, metric = 'developers', include_app_info = True, sleep = 0.45): 
+    # -- Returns df of developer activity with columns: ['date', 'protocol', 'metric', 'value', 'sub_ecosystems (if applicable)']
+    # ---- > Logic: 1) Set api params in object state. 2) edit params in state to be defaults if not provided. 3) call api. 4) process data. 5) return df
+    # ---- > Note: if no ecosystems provided, returns data for all ecosystems combined (artemis default. single api call)
+    # ---- > valid metrics: 'developers', 'commits'
+
+    if len(ecosystems) == 0:
+      datas = getDeveloperActivity_api('', days_back, include_forks, metric, self.api_key)
+      processed_data = processDevActivity(datas, metric)
+      return processed_data
+
+    else: 
+      datas = []
+      valid_ecosystems_raw = getDevEcosystems_api(self.api_key)
+      valid_ecosystems = processEcosystems(valid_ecosystems_raw)
+
+      for ecosystem in ecosystems:
+        if ecosystem not in valid_ecosystems:
+          print(f'Warning -- {ecosystem} is not a valid ecosystem, skipping') if self.verbose else None
+          continue
+
+        data = getDeveloperActivity_api(ecosystem, days_back, include_forks, metric, self.api_key)
+        datas.extend(data)
+        time.sleep(sleep)
+
+    
+    processed_data = processDevActivity(datas, metric)
+
+    if include_app_info == True:
+      processed_data = appendAppInfo(processed_data, chains=self.valid_chains)
+
+    return processed_data
+    
 
   
 
